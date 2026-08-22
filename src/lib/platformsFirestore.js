@@ -22,11 +22,13 @@ function mergeList(baseList, overrides) {
   return baseList.map((item) => ({ ...item, ...(overrides?.[item.id] || {}) }))
 }
 
-// Matches the exact "is this card locked?" rule PlatformCard.jsx uses: an
-// explicit `locked: true`, OR a link-kind card with no href yet (freshly
-// added platforms with an empty URL should never look clickable).
+// Matches PlatformCard.jsx's own "is this card visually locked?" rule: an
+// explicit `locked: true` from the admin panel. Whether a link-kind card
+// has a real href yet is a *separate* thing (see PlatformCard's
+// `noDestination`) - an admin can flip a card "live" before pasting its
+// URL, and it must look live (not "Coming Soon") while that's true.
 export function isLocked(item) {
-  return !!item.locked || (item.kind === 'link' && !item.href && !item.url)
+  return !!item.locked
 }
 
 // Public-site-only display order: every unlocked ("LIVE") card first, then
@@ -73,10 +75,18 @@ export function subscribePlatforms(callback, options = {}) {
 }
 
 export async function setPlatformOverride(id, patch) {
+  // IMPORTANT: write each changed field at its own dotted path
+  // (overrides.<id>.<field>) instead of replacing the whole
+  // overrides.<id> object. Replacing the whole object was wiping out
+  // whatever was set moments earlier - e.g. toggling a card "live" then
+  // saving its URL would silently erase the "live" override, so the
+  // toggle looked like it reset itself back to locked after saving.
+  const updates = {}
+  for (const [key, value] of Object.entries(patch)) {
+    updates[`overrides.${id}.${key}`] = value
+  }
   try {
-    // Targeted write: only touches overrides.<id>, leaves every other
-    // platform's override completely untouched.
-    await updateDoc(platformsDocRef, { [`overrides.${id}`]: patch })
+    await updateDoc(platformsDocRef, updates)
   } catch (err) {
     // Only reachable the very first time this document doesn't exist yet -
     // create it with just this one override, nothing wiped.
