@@ -24,7 +24,7 @@ export default function AdminOverview() {
       subscribePresenceCount(setOnlineNow),
       subscribeAppControl((c) => setMaintenanceMode(!!c.maintenanceMode)),
       subscribePlatforms((data) => {
-        const allLocked = data.platforms.filter((p) => p.locked || (p.kind === 'link' && !p.href)).length
+        const allLocked = data.platforms.filter((p) => p.locked).length
         setLockedCount(allLocked)
       }),
       subscribeAdminsList((list) => setAdminCount(list.length)),
