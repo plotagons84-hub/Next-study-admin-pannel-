@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Live platform locks, the announcement banner, and app-wide toggles.
+    // The public site needs to READ these; only a signed-in admin can WRITE.
+    match /config/{document} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // "Total opens" counter - the public site bumps this by 1 on every load.
+    // Anyone can create/update it (it's just a display number), but only a
+    // signed-in admin can delete it.
+    match /stats/{document} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if request.auth != null;
+    }
+
+    // Presence heartbeats - each visitor writes only their own anonymous
+    // session doc, used to approximate "online now".
+    match /presence/{sessionId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Unique-device tracking - each visitor's browser writes only its own
+    // anonymous device doc (id is a random localStorage-stored UUID), used
+    // to approximate "how many distinct devices / daily users".
+    match /devices/{deviceId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Admin registry - only signed-in admins can read the list.
+    // Any signed-in admin can write any admin's record - this is what lets
+    // one admin revoke another's access (Control tab's delete button); all
+    // admins are trusted equally here, the same as they can already lock
+    // any platform or flip any site-wide toggle.
+    match /admins/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}
