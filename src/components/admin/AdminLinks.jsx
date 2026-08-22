@@ -132,6 +132,14 @@ function PlatformRow({ item, meta, hasUrl, onToggle, onToggleHidden, onSaveUrl, 
   const [toggling, setToggling] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
+  // Keep the input in sync with whatever Firestore actually has - not just
+  // whatever was typed here. Without this, the field could look "wrong" or
+  // empty after a save if this row never remounts (e.g. after toggling
+  // Lock/Hide right after saving a link), even though Firestore is fine.
+  useEffect(() => {
+    setUrl(item.href ?? item.url ?? '')
+  }, [item.href, item.url])
+
   async function toggle() {
     setToggling(true)
     onError('')
@@ -147,8 +155,16 @@ function PlatformRow({ item, meta, hasUrl, onToggle, onToggleHidden, onSaveUrl, 
   async function confirmSave() {
     setConfirmOpen(false)
     onError('')
+    // Auto-fix the single most common typo: pasting a link without
+    // "https://" in front. Browsers treat a bare domain like
+    // "next-study-pi.faizan92048.workers.dev" as a *relative* path on the
+    // CURRENT site instead of an external address, so clicking the card on
+    // the public site 404s on the public site itself instead of opening
+    // the intended link. Prepending the scheme here fixes that for good.
+    const normalized = url && !/^https?:\/\//i.test(url) ? `https://${url}` : url
     try {
-      await onSaveUrl(url)
+      await onSaveUrl(normalized)
+      setUrl(normalized)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
